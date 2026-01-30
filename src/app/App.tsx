@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { Dashboard } from './components/Dashboard';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -35,6 +37,7 @@ export default function App() {
       ) : (
         <Dashboard onLogout={handleLogout} />
       )}
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 }
