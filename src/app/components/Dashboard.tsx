@@ -204,7 +204,7 @@ const handleDeleteDebtor = (id: string) => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
-                      <TableHead>CPF</TableHead>
+                      <TableHead>Telefone</TableHead>
                       <TableHead>Valor Total</TableHead>
                       <TableHead>Parcelas</TableHead>
                       <TableHead>Juros</TableHead>
@@ -219,7 +219,7 @@ const handleDeleteDebtor = (id: string) => {
                     {debtors.map((debtor) => (
                       <TableRow key={debtor.id}>
                         <TableCell className="font-medium">{debtor.name}</TableCell>
-                        <TableCell>{debtor.cpf}</TableCell>
+                        <TableCell>{debtor.telefone}</TableCell>
                         <TableCell>{formatCurrency(debtor.amount)}</TableCell>
                         <TableCell>{debtor.paidInstallments}/{debtor.installments}</TableCell>
                         <TableCell>{debtor.interestRate}%</TableCell>

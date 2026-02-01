@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'; // Adicionado useEffect
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 
+
 export interface Debtor {
   id: string;
   name: string;
-  cpf: string;
+  telefone: string;
   amount: number;
   installments: number;
   paidInstallments: number;
@@ -24,28 +25,25 @@ interface AddDebtorModalProps {
   initialData?: Debtor | null;
 }
 
-// ADICIONADO: initialData aqui nos parâmetros
 export function AddDebtorModal({ open, onOpenChange, onAddDebtor, initialData }: AddDebtorModalProps) {
   const [name, setName] = useState('');
-  const [cpf, setCpf] = useState('');
+  const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [installments, setInstallments] = useState('');
   const [interestRate, setInterestRate] = useState('');
   const [dueDate, setDueDate] = useState('');
 
-  // --- NOVO: Efeito para carregar dados quando for EDITAR ---
   useEffect(() => {
     if (initialData && open) {
       setName(initialData.name);
-      setCpf(initialData.cpf);
+      setPhone(initialData.telefone);
       setAmount(initialData.amount.toString());
       setInstallments(initialData.installments.toString());
       setInterestRate(initialData.interestRate.toString());
       setDueDate(initialData.dueDate);
     } else if (!initialData && open) {
-      // Limpa o formulário se for um novo devedor
       setName('');
-      setCpf('');
+      setPhone('');
       setAmount('');
       setInstallments('');
       setInterestRate('');
@@ -59,10 +57,25 @@ export function AddDebtorModal({ open, onOpenChange, onAddDebtor, initialData }:
     return principal * (monthlyRate * Math.pow(1 + monthlyRate, periods)) / (Math.pow(1 + monthlyRate, periods) - 1);
   };
 
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      return numbers
+        .replace(/^(\d{2})(\d)/g, '($1) $2')
+        .replace(/(\d)(\d{4})$/, '$1-$2');
+    }
+    return value;
+  };
+
+  const isPhoneValid = (phone: string): boolean => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    return cleanPhone.length >= 10 && cleanPhone.length <= 11 && !/^(\d)\1+$/.test(cleanPhone);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (name && cpf && amount && installments && interestRate && dueDate) {
+    if (name && phone && amount && installments && interestRate && dueDate) {
       const principal = parseFloat(amount);
       const periods = parseInt(installments);
       const rate = parseFloat(interestRate);
@@ -70,10 +83,9 @@ export function AddDebtorModal({ open, onOpenChange, onAddDebtor, initialData }:
 
       onAddDebtor({
         name,
-        cpf,
+        telefone: phone,
         amount: principal,
         installments: periods,
-        // Mantém as parcelas pagas se estiver editando, senão começa com 0
         paidInstallments: initialData ? initialData.paidInstallments : 0,
         interestRate: rate,
         monthlyPayment,
@@ -83,31 +95,6 @@ export function AddDebtorModal({ open, onOpenChange, onAddDebtor, initialData }:
 
       onOpenChange(false);
     }
-  };
-
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 11) {
-      return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    }
-    return value;
-  };
-
-  const isCPFValid = (cpf: string): boolean => {
-    const cleanCPF = cpf.replace(/\D/g, '');
-    if (cleanCPF.length !== 11 || !!cleanCPF.match(/(\d)\1{10}/)) return false;
-    const digits = cleanCPF.split('').map(Number);
-    let sum = 0;
-    for (let i = 1; i <= 9; i++) sum += digits[i - 1] * (11 - i);
-    let remainder = (sum * 10) % 11;
-    if (remainder === 10 || remainder === 11) remainder = 0;
-    if (remainder !== digits[9]) return false;
-    sum = 0;
-    for (let i = 1; i <= 10; i++) sum += digits[i - 1] * (12 - i);
-    remainder = (sum * 10) % 11;
-    if (remainder === 10 || remainder === 11) remainder = 0;
-    if (remainder !== digits[10]) return false;
-    return true;
   };
 
   return (
@@ -123,27 +110,39 @@ export function AddDebtorModal({ open, onOpenChange, onAddDebtor, initialData }:
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome Completo</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)}
+                placeholder='Ex: João da Silva' required />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="cpf">CPF</Label>
-              <Input id="cpf" value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))} />
-              {cpf.length === 14 && !isCPFValid(cpf) && (
-                <span className="text-red-500 text-xs">Este CPF não é válido!</span>
+              <Label htmlFor="phone">Telefone</Label>
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                placeholder="(00) 00000-0000"
+                required
+              />
+              {phone.length > 2 && !isPhoneValid(phone) && (
+                <span className="text-red-500 text-xs">Informe um telefone válido (DDD + Número)</span>
               )}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="amount">Valor do Empréstimo (R$)</Label>
-              <Input id="amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+              <Input id="amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} 
+              placeholder='Ex: R$1000.00' required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="installments">Nº de Parcelas</Label>
-                <Input id="installments" type="number" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} required />
+                <Input id="installments" type="number" min="1" value={installments} onChange={(e) => setInstallments(e.target.value)} 
+                placeholder='Ex: 12' required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="interestRate">Juros (% ao mês)</Label>
-                <Input id="interestRate" type="number" step="0.1" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} required />
+                <Input id="interestRate" type="number" step="0.1" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} 
+                placeholder='Ex: 2.5%' required />
               </div>
             </div>
             <div className="space-y-2">
