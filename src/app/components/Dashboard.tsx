@@ -3,9 +3,12 @@ import { Button } from './ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { AddDebtorModal, Debtor } from './AddDebtorModal';
-import { Plus, LogOut, Trash2, DollarSign, Users, AlertCircle, Pencil } from 'lucide-react'; import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Plus, LogOut, Trash2, DollarSign, Users, AlertCircle, Pencil, MessageCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ReportModal } from './ReportModal';
+import { OverdueModal } from './OverdueModal';
 import { toast } from 'react-toastify';
+import { isAfter, parseISO, startOfDay } from 'date-fns';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -16,30 +19,39 @@ export function Dashboard({ onLogout }: DashboardProps) {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null);
+  const [isOverdueModalOpen, setIsOverdueModalOpen] = useState(false);
 
   // --- FUNÇÕES DE AÇÃO ---
+  const getComputedStatus = (debtor: Debtor) => {
+    if (debtor.status === 'pago') return 'pago';
+
+    const today = startOfDay(new Date());
+    const dueDate = startOfDay(parseISO(debtor.dueDate));
+
+    return isAfter(today, dueDate) ? 'atrasado' : 'pendente';
+  };
   const handleSaveDebtor = (debtorData: Omit<Debtor, 'id'>) => {
     if (editingDebtor) {
       setDebtors(debtors.map(d => d.id === editingDebtor.id ? { ...debtorData, id: d.id } : d));
-      toast.success("Cadastro atualizado com sucesso!"); 
+      toast.success("Cadastro atualizado com sucesso!");
     } else {
       const newDebtor: Debtor = { ...debtorData, id: Date.now().toString() };
       setDebtors([...debtors, newDebtor]);
-      toast.success("Novo devedor adicionado!"); 
+      toast.success("Novo devedor adicionado!");
     }
     setEditingDebtor(null);
     setIsModalOpen(false);
   };
 
   const handleEditClick = (debtor: Debtor) => {
-    setEditingDebtor(debtor); 
-    setIsModalOpen(true);     
+    setEditingDebtor(debtor);
+    setIsModalOpen(true);
   };
 
-const handleDeleteDebtor = (id: string) => {
-  setDebtors(debtors.filter(debtor => debtor.id !== id));
-  toast.error("Devedor removido do sistema.");
-};
+  const handleDeleteDebtor = (id: string) => {
+    setDebtors(debtors.filter(debtor => debtor.id !== id));
+    toast.error("Devedor removido do sistema.");
+  };
 
   const handlePayMonth = (id: string) => {
     setDebtors(debtors.map(debtor => {
@@ -89,8 +101,11 @@ const handleDeleteDebtor = (id: string) => {
     }).format(value);
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR');
+  const formatDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+
+    return date.toLocaleDateString('pt-BR');
   };
 
   const getStatusBadge = (status: Debtor['status']) => {
@@ -106,13 +121,15 @@ const handleDeleteDebtor = (id: string) => {
   // --- CÁLCULOS DE RESUMO ---
   const totalAmount = debtors.reduce((sum, d) => sum + d.amount, 0);
   const pendingAmount = debtors
-    .filter(d => d.status !== 'pago')
+    .filter(d => getComputedStatus(d) !== 'pago')
     .reduce((sum, d) => {
       const parcelasRestantes = d.installments - d.paidInstallments;
       return sum + (d.monthlyPayment * parcelasRestantes);
     }, 0);
-  const overdueCount = debtors.filter(d => d.status === 'atrasado').length;
-  const monthlyReceivable = debtors.filter(d => d.status !== 'pago').reduce((sum, d) => sum + d.monthlyPayment, 0);
+  const overdueCount = debtors.filter(d => getComputedStatus(d) === 'atrasado').length;
+  const monthlyReceivable = debtors
+    .filter(d => getComputedStatus(d) !== 'pago')
+    .reduce((sum, d) => sum + d.monthlyPayment, 0);
 
   return (
     <div className="min-h-screen w-full bg-gray-50">
@@ -163,14 +180,23 @@ const handleDeleteDebtor = (id: string) => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Atrasados</CardTitle>
               <AlertCircle className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{overdueCount}</div>
+              <div className="text-2xl font-bold text-red-600">{overdueCount}</div>
             </CardContent>
+
+            {/* Botão atualizado para abrir o seu novo Modal */}
+            <Button
+              variant="link"
+              className="mt-2 mb-4 p-2 bg-gray-100 hover:bg-gray-200 w-[80%] block mx-auto no-underline hover:no-underline text-gray-700 text-xs font-semibold rounded-md"
+              onClick={() => setIsOverdueModalOpen(true)}
+            >
+              Ver Lista de Atrasados
+            </Button>
           </Card>
         </div>
 
@@ -228,11 +254,24 @@ const handleDeleteDebtor = (id: string) => {
                           {formatCurrency(debtor.monthlyPayment * (debtor.installments - debtor.paidInstallments))}
                         </TableCell>
                         <TableCell>{formatDate(debtor.dueDate)}</TableCell>
-                        <TableCell>{getStatusBadge(debtor.status)}</TableCell>
+                        <TableCell>{getStatusBadge(getComputedStatus(debtor))}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             {debtor.status !== 'pago' && (
                               <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title="Cobrar via WhatsApp"
+                                  onClick={() => {
+                                    const cleanPhone = debtor.telefone.replace(/\D/g, '');
+                                    const message = `Olá ${debtor.name}, tudo bem? Passando para lembrar do seu vencimento em ${formatDate(debtor.dueDate)} no valor de "${formatCurrency(debtor.monthlyPayment)}.`;
+                                    window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+                                  }}
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                >
+                                  <MessageCircle className="w-4 h-4" />
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -272,6 +311,11 @@ const handleDeleteDebtor = (id: string) => {
       <ReportModal
         open={isReportOpen}
         onOpenChange={setIsReportOpen}
+        debtors={debtors}
+      />
+      <OverdueModal
+        open={isOverdueModalOpen}
+        onOpenChange={setIsOverdueModalOpen}
         debtors={debtors}
       />
     </div>
